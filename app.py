@@ -176,7 +176,7 @@ else:
         st.warning("Bu seçim için 'products' sayfasında satır yok.")
     else:
         display=(prods["UrunAdi"]+" — "+prods["MakineTipi"]).tolist()
-st.session_state.setdefault("product_choice", display[0])
+    st.session_state.setdefault("product_choice", display[0])
 sel = st.radio("Ürün", options=display, key="product_choice")
 ix = display.index(sel)
 chosen = prods.iloc[ix].to_dict()
