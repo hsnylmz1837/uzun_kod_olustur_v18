@@ -177,141 +177,141 @@ else:
     else:
         display=(prods["UrunAdi"]+" — "+prods["MakineTipi"]).tolist()
     st.session_state.setdefault("product_choice", display[0])
-sel = st.radio("Ürün", options=display, key="product_choice")
-ix = display.index(sel)
-chosen = prods.iloc[ix].to_dict()
-prev = st.session_state.get("product_row")
-if (prev is None) or (prev.get("MakineTipi") != chosen["MakineTipi"]):
-    st.session_state["form_values"] = {}
-    st.session_state["long_code_parts"] = []
-    st.session_state["long_code"] = ""
-    st.session_state["last_added"] = []
-st.session_state["product_row"] = chosen
-row=st.session_state["product_row"]
-if row is not None:
-    mk=row["MakineTipi"]
-    st.info(f"Seçilen makine: **{mk}** — Kod: **{row['UrunKodu']}**")
-    secs=schema["sections"].query("Kategori1==@s1 and Kategori2==@s2 and MakineTipi==@mk").sort_values("Order")
-    if secs.empty:
-        st.warning("Bu makine için 'sections' sayfasında kayıt yok.")
-    else:
-        fdf=schema["fields"]; optdf=schema["options"]
-        def section_status(sec_key):
-            fields=fdf.query("SectionKey==@sec_key")
-            eligible=[]; missing=[]
-            for _,fld in fields.iterrows():
-                showtype=str(fld.get("ShowType") or "").strip().lower() or "lock"
-                en=prereq_ok(fld.get("PrereqFieldKey"), fld.get("PrereqAllowValues"))
-                if (not en and showtype=="hide"): 
-                    continue
-                if not en: 
-                    continue
-                if bool(fld.get("Required")):
-                    k=fld["FieldKey"]; val=st.session_state["form_values"].get(k)
-                    typ=str(fld["Type"]).lower()
-                    if typ=="multiselect":
-                        filled=isinstance(val,list) and len(val)>0
-                    else:
-                        filled=(val not in (None,""))
-                    eligible.append(k)
-                    if not filled: missing.append(fld["FieldLabel"])
-            return {"eligible":eligible, "missing":missing, "complete": (len(missing)==0) if len(eligible)>0 else True}
-
-        statuses=[(sec.SectionKey, sec.SectionLabel, section_status(sec.SectionKey)) for _,sec in secs.iterrows()]
-        block_idx=None
-        for i,(_,_,stt) in enumerate(statuses):
-            if not stt["complete"]:
-                block_idx=i; break
-
-        tabs=st.tabs([f"{emoji_for(sec.SectionKey, sec.SectionLabel)} {sec.SectionLabel}" for _,sec in secs.iterrows()])
-        for i,((_,sec),tab) in enumerate(zip(secs.iterrows(), tabs)):
-            with tab:
-                sec_key=sec.SectionKey
-                sec_label=sec.SectionLabel
-                cols = st.columns([2,1])
-                with cols[0]:
-                    fields=fdf.query("SectionKey==@sec_key")
-                    if fields.empty:
-                        st.write("Alan yok.")
-                    else:
-                        if (block_idx is not None) and (i>block_idx):
-                            missing = statuses[block_idx][2]["missing"]
-                            missing_txt = (" (" + ", ".join(missing) + ")") if missing else ""
-                            st.warning(f"🔒 Önce **{statuses[block_idx][1]}** bölümündeki zorunlu alanları tamamlayın{missing_txt}.")
+    sel = st.radio("Ürün", options=display, key="product_choice")
+    ix = display.index(sel)
+    chosen = prods.iloc[ix].to_dict()
+    prev = st.session_state.get("product_row")
+    if (prev is None) or (prev.get("MakineTipi") != chosen["MakineTipi"]):
+        st.session_state["form_values"] = {}
+        st.session_state["long_code_parts"] = []
+        st.session_state["long_code"] = ""
+        st.session_state["last_added"] = []
+    st.session_state["product_row"] = chosen
+    row=st.session_state["product_row"]
+    if row is not None:
+        mk=row["MakineTipi"]
+        st.info(f"Seçilen makine: **{mk}** — Kod: **{row['UrunKodu']}**")
+        secs=schema["sections"].query("Kategori1==@s1 and Kategori2==@s2 and MakineTipi==@mk").sort_values("Order")
+        if secs.empty:
+            st.warning("Bu makine için 'sections' sayfasında kayıt yok.")
+        else:
+            fdf=schema["fields"]; optdf=schema["options"]
+            def section_status(sec_key):
+                fields=fdf.query("SectionKey==@sec_key")
+                eligible=[]; missing=[]
+                for _,fld in fields.iterrows():
+                    showtype=str(fld.get("ShowType") or "").strip().lower() or "lock"
+                    en=prereq_ok(fld.get("PrereqFieldKey"), fld.get("PrereqAllowValues"))
+                    if (not en and showtype=="hide"): 
+                        continue
+                    if not en: 
+                        continue
+                    if bool(fld.get("Required")):
+                        k=fld["FieldKey"]; val=st.session_state["form_values"].get(k)
+                        typ=str(fld["Type"]).lower()
+                        if typ=="multiselect":
+                            filled=isinstance(val,list) and len(val)>0
                         else:
-                            for _,fld in fields.iterrows():
-                                k=fld["FieldKey"]; label=fld["FieldLabel"]; typ=str(fld["Type"]).lower(); req=bool(fld["Required"]); default=fld.get("Default")
-                                showtype=str(fld.get("ShowType") or "").strip().lower() or "lock"
-                                en=prereq_ok(fld.get("PrereqFieldKey"), fld.get("PrereqAllowValues"))
-                                if not en and showtype=="hide": continue
-                                if not en and showtype=="lock": st.caption(prereq_message(fld.get("PrereqFieldKey"), fld.get("PrereqAllowValues")))
-                                disabled=(not en)
-                                widget=str(fld.get("Widget") or "").strip().lower()
-                                if typ in ("select","multiselect"):
-                                    if pd.isna(fld.get("OptionsKey")) or str(fld.get("OptionsKey")).strip()=="":
-                                        continue
-                                    opts=optdf.query("OptionsKey==@fld.OptionsKey").sort_values("Order")
-                                    opts=option_filter(opts)
-                                    opts_codes=opts["ValueCode"].astype(str).tolist()
-                                    opts_labels=(opts["ValueCode"].astype(str)+" — "+opts["ValueLabel"].astype(str)).tolist()
-                                    if typ=="select":
-                                        if widget=="radio":
-                                            sel=st.radio(label+(" *" if req else ""), options=opts_codes,
-                                                         format_func=lambda c: opts_labels[opts_codes.index(c)],
-                                                         index=None, key=f"k_{k}", disabled=disabled, horizontal=False)
-                                        else:
-                                            sel=st.selectbox(label+(" *" if req else ""), options=opts_codes,
+                            filled=(val not in (None,""))
+                        eligible.append(k)
+                        if not filled: missing.append(fld["FieldLabel"])
+                return {"eligible":eligible, "missing":missing, "complete": (len(missing)==0) if len(eligible)>0 else True}
+    
+            statuses=[(sec.SectionKey, sec.SectionLabel, section_status(sec.SectionKey)) for _,sec in secs.iterrows()]
+            block_idx=None
+            for i,(_,_,stt) in enumerate(statuses):
+                if not stt["complete"]:
+                    block_idx=i; break
+    
+            tabs=st.tabs([f"{emoji_for(sec.SectionKey, sec.SectionLabel)} {sec.SectionLabel}" for _,sec in secs.iterrows()])
+            for i,((_,sec),tab) in enumerate(zip(secs.iterrows(), tabs)):
+                with tab:
+                    sec_key=sec.SectionKey
+                    sec_label=sec.SectionLabel
+                    cols = st.columns([2,1])
+                    with cols[0]:
+                        fields=fdf.query("SectionKey==@sec_key")
+                        if fields.empty:
+                            st.write("Alan yok.")
+                        else:
+                            if (block_idx is not None) and (i>block_idx):
+                                missing = statuses[block_idx][2]["missing"]
+                                missing_txt = (" (" + ", ".join(missing) + ")") if missing else ""
+                                st.warning(f"🔒 Önce **{statuses[block_idx][1]}** bölümündeki zorunlu alanları tamamlayın{missing_txt}.")
+                            else:
+                                for _,fld in fields.iterrows():
+                                    k=fld["FieldKey"]; label=fld["FieldLabel"]; typ=str(fld["Type"]).lower(); req=bool(fld["Required"]); default=fld.get("Default")
+                                    showtype=str(fld.get("ShowType") or "").strip().lower() or "lock"
+                                    en=prereq_ok(fld.get("PrereqFieldKey"), fld.get("PrereqAllowValues"))
+                                    if not en and showtype=="hide": continue
+                                    if not en and showtype=="lock": st.caption(prereq_message(fld.get("PrereqFieldKey"), fld.get("PrereqAllowValues")))
+                                    disabled=(not en)
+                                    widget=str(fld.get("Widget") or "").strip().lower()
+                                    if typ in ("select","multiselect"):
+                                        if pd.isna(fld.get("OptionsKey")) or str(fld.get("OptionsKey")).strip()=="":
+                                            continue
+                                        opts=optdf.query("OptionsKey==@fld.OptionsKey").sort_values("Order")
+                                        opts=option_filter(opts)
+                                        opts_codes=opts["ValueCode"].astype(str).tolist()
+                                        opts_labels=(opts["ValueCode"].astype(str)+" — "+opts["ValueLabel"].astype(str)).tolist()
+                                        if typ=="select":
+                                            if widget=="radio":
+                                                sel=st.radio(label+(" *" if req else ""), options=opts_codes,
                                                              format_func=lambda c: opts_labels[opts_codes.index(c)],
-                                                             index=None, key=f"k_{k}", disabled=disabled, placeholder="Seçiniz")
-                                        if en and sel is not None: st.session_state["form_values"][k]=sel
-                                        else: st.session_state["form_values"].pop(k, None)
-                                    else:
-                                        if widget=="checkboxes":
-                                            selected=set(map(str, st.session_state["form_values"].get(k, [])))
-                                            new_selected=[]
-                                            for code,lbl in zip(opts_codes, opts_labels):
-                                                chk=st.checkbox(lbl, key=f"chk_{k}_{code}", value=(code in selected), disabled=disabled)
-                                                if chk: new_selected.append(code)
-                                            if en and new_selected: st.session_state["form_values"][k]=new_selected
+                                                             index=None, key=f"k_{k}", disabled=disabled, horizontal=False)
+                                            else:
+                                                sel=st.selectbox(label+(" *" if req else ""), options=opts_codes,
+                                                                 format_func=lambda c: opts_labels[opts_codes.index(c)],
+                                                                 index=None, key=f"k_{k}", disabled=disabled, placeholder="Seçiniz")
+                                            if en and sel is not None: st.session_state["form_values"][k]=sel
                                             else: st.session_state["form_values"].pop(k, None)
                                         else:
-                                            ms=st.multiselect(label+(" *" if req else ""), options=opts_codes, default=[],
-                                                              format_func=lambda c: opts_labels[opts_codes.index(c)],
-                                                              key=f"k_{k}", disabled=disabled, placeholder="Seçiniz")
-                                            if en and ms: st.session_state["form_values"][k]=ms
-                                            else: st.session_state["form_values"].pop(k, None)
-                                elif typ=="number":
-                                    minv=fld.get("Min"); maxv=fld.get("Max"); step=fld.get("Step")
-                                    decimals=fld.get("Decimals"); d=int(decimals) if pd.notna(decimals) else 0
-                                    if pd.isna(step): step=1 if d==0 else 10**(-d)
-                                    if d==0:
-                                        minv_i=int(minv) if pd.notna(minv) else None
-                                        maxv_i=int(maxv) if pd.notna(maxv) else None
-                                        defv_i=int(default) if pd.notna(default) else (minv_i or 0)
-                                        step_i=int(step)
-                                        val=st.number_input(label+(" *" if req else ""), min_value=minv_i, max_value=maxv_i,
-                                                            value=defv_i, step=step_i, format="%d", key=f"k_{k}", disabled=disabled)
+                                            if widget=="checkboxes":
+                                                selected=set(map(str, st.session_state["form_values"].get(k, [])))
+                                                new_selected=[]
+                                                for code,lbl in zip(opts_codes, opts_labels):
+                                                    chk=st.checkbox(lbl, key=f"chk_{k}_{code}", value=(code in selected), disabled=disabled)
+                                                    if chk: new_selected.append(code)
+                                                if en and new_selected: st.session_state["form_values"][k]=new_selected
+                                                else: st.session_state["form_values"].pop(k, None)
+                                            else:
+                                                ms=st.multiselect(label+(" *" if req else ""), options=opts_codes, default=[],
+                                                                  format_func=lambda c: opts_labels[opts_codes.index(c)],
+                                                                  key=f"k_{k}", disabled=disabled, placeholder="Seçiniz")
+                                                if en and ms: st.session_state["form_values"][k]=ms
+                                                else: st.session_state["form_values"].pop(k, None)
+                                    elif typ=="number":
+                                        minv=fld.get("Min"); maxv=fld.get("Max"); step=fld.get("Step")
+                                        decimals=fld.get("Decimals"); d=int(decimals) if pd.notna(decimals) else 0
+                                        if pd.isna(step): step=1 if d==0 else 10**(-d)
+                                        if d==0:
+                                            minv_i=int(minv) if pd.notna(minv) else None
+                                            maxv_i=int(maxv) if pd.notna(maxv) else None
+                                            defv_i=int(default) if pd.notna(default) else (minv_i or 0)
+                                            step_i=int(step)
+                                            val=st.number_input(label+(" *" if req else ""), min_value=minv_i, max_value=maxv_i,
+                                                                value=defv_i, step=step_i, format="%d", key=f"k_{k}", disabled=disabled)
+                                        else:
+                                            fmt=f"%.{d}f"
+                                            minv_f=float(minv) if pd.notna(minv) else None
+                                            maxv_f=float(maxv) if pd.notna(maxv) else None
+                                            defv_f=float(default) if pd.notna(default) else (minv_f or 0.0)
+                                            step_f=float(step) if pd.notna(step) else 10**(-d)
+                                            val=st.number_input(label+(" *" if req else ""), min_value=minv_f, max_value=maxv_f,
+                                                                value=defv_f, step=step_f, format=fmt, key=f"k_{k}", disabled=disabled)
+                                        if en: st.session_state["form_values"][k]=val
                                     else:
-                                        fmt=f"%.{d}f"
-                                        minv_f=float(minv) if pd.notna(minv) else None
-                                        maxv_f=float(maxv) if pd.notna(maxv) else None
-                                        defv_f=float(default) if pd.notna(default) else (minv_f or 0.0)
-                                        step_f=float(step) if pd.notna(step) else 10**(-d)
-                                        val=st.number_input(label+(" *" if req else ""), min_value=minv_f, max_value=maxv_f,
-                                                            value=defv_f, step=step_f, format=fmt, key=f"k_{k}", disabled=disabled)
-                                    if en: st.session_state["form_values"][k]=val
-                                else:
-                                    txt=st.text_input(label+(" *" if req else ""), value=clean_str(default),
-                                                      key=f"k_{k}", disabled=disabled, placeholder="Seçiniz")
-                                    if en and txt.strip()!="": st.session_state["form_values"][k]=txt
-                                    else: st.session_state["form_values"].pop(k, None)
-                with cols[1]:
-                    fname = str(sec.FileName) if not pd.isna(sec.FileName) else ""
-                    pth = os.path.join("data", fname) if fname else ""
-                    if fname and os.path.exists(pth):
-                        _image_wc(pth, caption=sec_label)
-                    else:
-                        st.caption("İllüstrasyon yok")
+                                        txt=st.text_input(label+(" *" if req else ""), value=clean_str(default),
+                                                          key=f"k_{k}", disabled=disabled, placeholder="Seçiniz")
+                                        if en and txt.strip()!="": st.session_state["form_values"][k]=txt
+                                        else: st.session_state["form_values"].pop(k, None)
+                    with cols[1]:
+                        fname = str(sec.FileName) if not pd.isna(sec.FileName) else ""
+                        pth = os.path.join("data", fname) if fname else ""
+                        if fname and os.path.exists(pth):
+                            _image_wc(pth, caption=sec_label)
+                        else:
+                            st.caption("İllüstrasyon yok")
 
     st.markdown('<div class="panel">', unsafe_allow_html=True)
 
