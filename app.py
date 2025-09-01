@@ -65,10 +65,34 @@ def sanitize_codes_only(s):
     return re.sub(r"[^A-Z0-9._-]","",str(s).upper()) if s is not None else ""
 
 def norm(s): return str(s).strip().casefold()
-def is_skip_valuecode(code): return norm(code) in {"yok","diger","diğer","var"}
+def is_skip_valuecode(code): return norm(code) in {"yok","diger","diğer","var"} # uzun kodda atlanacak valuecodelar # 'diger' varyantını da kapsa
 def parse_allow_values(s): 
-    s=(s or "").strip(); 
-    return [] if not s else [v.strip() for v in s.split(",") if v.strip()]
+    """
+    PrereqAllowValues hücresini güvenli şekilde listeye çevirir.
+    Kabul edilen formatlar:
+      - "A,B,C" gibi stringler
+      - ["A","B"] gibi list/tuple/set
+      - int/float (örn. 0) → "0" olarak kabul edilir
+      - NaN/None/boş → []
+    """
+    # None/NaN yakala
+    try:
+        import math
+        if s is None:
+            return []
+        if isinstance(s, float) and math.isnan(s):
+            return []
+    except Exception:
+        pass
+    # Zaten listeyse
+    if isinstance(s, (list, tuple, set)):
+        return [str(v).strip() for v in s if str(v).strip()]
+    # Sayısal veya diğer tipleri stringe çevir
+    s = str(s).strip()
+    if not s or s.lower() in {"nan", "none"}:
+        return []
+    # virgülle ayrılmış ise parçala
+    return [v.strip() for v in s.split(",") if v.strip()]
 
 def prereq_ok(fk, allow)->bool:
     if fk is None: return True
