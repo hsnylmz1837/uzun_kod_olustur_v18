@@ -180,7 +180,7 @@ else:
             st.session_state["product_choice"]=display[0]
         st.session_state.setdefault("product_choice", display[0])
 sel = st.radio("Ürün", options=display, key="product_choice")
-        ix=display.index(sel)
+    ix=display.index(sel)
         chosen=prods.iloc[ix].to_dict()
         prev = st.session_state.get("product_row")
         if (prev is None) or (prev.get("MakineTipi")!=chosen["MakineTipi"]):
