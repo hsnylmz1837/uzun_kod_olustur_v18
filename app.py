@@ -75,11 +75,23 @@ def prereq_ok(fk, allow)->bool:
     if isinstance(fk,float) and math.isnan(fk): return True
     fk=str(fk).strip()
     if fk=="" or fk.lower() in {"nan","none"}: return True
-    v=st.session_state["form_values"].get(fk)
-    if v in (None,"",[]): return False
-    allowset=set([sanitize_codes_only(a) for a in parse_allow_values(allow)])
-    if not allowset: return True
-    if isinstance(v,list): return any(sanitize_codes_only(x) in allowset for x in v)
+    # 1) Önce form_values
+    v = st.session_state["form_values"].get(fk)
+
+    # 2) Henüz form_values dolmadıysa: canlı widget değerini dene
+    if v in (None, "", []):
+        raw_key = f"k_{fk}"
+        if raw_key in st.session_state:
+            v = st.session_state.get(raw_key)
+
+    if v in (None, "", []):  # hâlâ yoksa önkoşul sağlanmadı
+        return False
+
+    allowset = set([sanitize_codes_only(a) for a in parse_allow_values(allow)])
+    if not allowset: 
+        return True
+    if isinstance(v, list):
+        return any(sanitize_codes_only(x) in allowset for x in v)
     return sanitize_codes_only(v) in allowset
 
 def prereq_message(fk, allow):
@@ -207,14 +219,21 @@ else:
                     if not en: 
                         continue
                     if bool(fld.get("Required")):
-                        k=fld["FieldKey"]; val=st.session_state["form_values"].get(k)
-                        typ=str(fld["Type"]).lower()
-                        if typ=="multiselect":
-                            filled=isinstance(val,list) and len(val)>0
+                        k = fld["FieldKey"]
+                        typ = str(fld["Type"]).lower()
+                    
+                        # Önce canlı widget değeri (k_{FieldKey}), yoksa form_values:
+                        raw = st.session_state.get(f"k_{k}", None)
+                        val = raw if raw not in (None, "", []) else st.session_state["form_values"].get(k)
+                    
+                        if typ == "multiselect":
+                            filled = isinstance(val, list) and len(val) > 0
                         else:
-                            filled=(val not in (None,""))
+                            filled = (val not in (None, ""))
+                    
                         eligible.append(k)
-                        if not filled: missing.append(fld["FieldLabel"])
+                        if not filled:
+                            missing.append(fld["FieldLabel"])
                 return {"eligible":eligible, "missing":missing, "complete": (len(missing)==0) if len(eligible)>0 else True}
     
             statuses=[(sec.SectionKey, sec.SectionLabel, section_status(sec.SectionKey)) for _,sec in secs.iterrows()]
